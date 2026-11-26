@@ -61,3 +61,9 @@ One alarm drives three deadlines: closing sockets that never sent `hello` (10 s)
 
 - `@cloudflare/vitest-pool-workers` (0.23) prints a notice that it was renamed to `@cloudflare/vitest-plugin`; it still works, and the migration is a codemod (`npx @cloudflare/codemods vitest:pool-workers-to-vitest-plugin`).
 - `compatibility_date` is pinned to a date the bundled workerd supports (2026-08-01).
+
+## Deployment (live)
+- **URL:** `https://tunegram-listen-together.tunegram-listen-together-backend.workers.dev`, on Cloudflare Workers' free plan. Durable Objects use SQLite storage.
+- **Deploy:** `cd backend && npx wrangler deploy`. Wrangler is signed in to the owner's account with Workers-only scopes: `wrangler login --scopes account:read user:read workers:write workers_scripts:write workers_routes:write workers_tail:read`.
+- **Secrets** (`wrangler secret put`): `TOKEN_SECRET` (local copy in `../.secrets/worker-token-secret`) and `BOT_TOKEN` (from `../.secrets/bot.json`). Never commit them.
+- **Mini App:** `t.me/TunegramSyncBot/listen` serves `GET /app`, the invite landing page (`src/landing.ts`). `GET /` serves the same page.

@@ -236,7 +236,7 @@ Items 3–7 are done in the owner's Chrome via the Claude browser extension. The
 3. ~~**Telegram API credentials**~~ → done 2026-11-26. Telegram allows one `api_id` per account, and the owner's account already had one, so Tunegram reuses that `api_id`/`api_hash` (saved in `.secrets/telegram.json`). The existing app's settings weren't changed.
 4. ~~**Telegram bot**~~ → done 2026-11-26: @TunegramSyncBot, token in `.secrets/bot.json` (verified with `getMe`). The Mini App is attached when the landing page is deployed.
 5. ~~**Firebase project**~~ → done 2026-11-26: project "Tunegram" (`tum-58a04`), Spark plan, Analytics and Gemini off; Android app `app.tunegram.android` registered; `google-services.json` is in `.secrets/`.
-6. **Cloudflare account** (free). Needed only when the backend is deployed (§6, Phase 3–4); local development uses the local Workers runtime.
+6. ~~**Cloudflare account**~~ → done 2026-11-26. The owner's existing free account (adilabdu68) is used. Wrangler is signed in with Workers-only OAuth permissions, and the server is live at `https://tunegram-listen-together.tunegram-listen-together-backend.workers.dev` (secrets `TOKEN_SECRET`, `BOT_TOKEN`). The Mini App `t.me/TunegramSyncBot/listen` points at its `/app` landing page.
 7. **App name and IDs:** working name Tunegram (§1).
 8. **Devices:** two iPhones already connected; later they need Developer Mode on. Simulators and the emulator come first.
 9. ~~Approval for Telegram test-environment accounts~~ → approved 2026-11-26.
