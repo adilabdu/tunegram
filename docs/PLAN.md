@@ -49,6 +49,7 @@ There is no sign-up and no separate login (see §4.4). No new permission prompts
 |---|---|
 | Anyone presses pause | Pauses for everyone |
 | Phone call on one device | That person is marked "interrupted"; others continue; "Catch up" when the call ends |
+| Playing other audio during a session (voice message, video message, another song) | Treated like a phone call: that person is marked "interrupted" and everyone else keeps playing. When the other audio ends, they automatically rejoin at the live position, with no tap needed. Applies on all platforms; it matters most on macOS, which has only one player (owner decision 2026-11-26) |
 | One device loses connection | "Reconnecting…" shown; on return it jumps to the live position |
 | Next track not ready on one device | Others wait up to 3 s, then continue; the late device joins at the live position |
 | Someone leaves | Everyone else continues; if the creator leaves, the session continues for the remaining listeners |
