@@ -165,6 +165,15 @@ The relay below gets built once a paid Apple account exists, or earlier if the A
   - iOS Simulator and macOS builds on macOS runners, with upstream's pinned Xcode;
   - Android on Linux runners.
   - A remote build cache keeps rebuilds fast.
+- **Repos:** all private, under the personal `adilabdu` GitHub account (unrelated to any company):
+  - `adilabdu/tunegram` holds the plan, shared core, backend and CI.
+  - `tunegram-ios`, `tunegram-android` and `tunegram-macos` each hold a mirror of upstream plus our changes. The macOS fork's Telegram-iOS submodule points at `tunegram-ios`.
+  - Local working copies are sparse partial clones, so only the files being edited take disk space.
+- **CI cost (private repos):**
+  - About 200 free macOS build minutes a month; after that, $0.062 per minute.
+  - Android builds run on Linux and fit within the free allowance.
+  - Estimate during active iPhone/Mac development: roughly $100–300 a month.
+  - Alternative: a one-time external SSD, so Apple builds run locally instead.
 - **This Mac only runs the results:**
   - the iOS Simulator (iOS 18 runtime already installed);
   - the Android Emulator (Pixel AVD, API 34, already installed);
