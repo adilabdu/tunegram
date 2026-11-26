@@ -67,3 +67,16 @@ For local builds, the scripts still need a "use a locally built app" path where 
 - Measured 2026-11-26 over USB 2.0:
   - **Raw FAT32:** about 36 MB/s write, 38 MB/s read, and only about 100 small files/s written.
   - **Inside the image:** about 4,100 small files/s written and about 22 MB/s uncached read.
+
+## Local builds (2026-11-27)
+- **Android:** ✅ built locally and running in the emulator at the welcome screen.
+  - Build: `:TMessagesProj_App:assembleAfatRelease`, 44 min first time, 53 MB APK. Run it in `~/Documents/projects/tunegram-work/tunegram-android` under `nice -n 10`, with `-Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" --max-workers=4 -I scripts/gradle/limit-native-jobs.gradle`. The init script caps ninja at 3 compile jobs and 1 link job; AGP ignores `--max-workers` for native code.
+  - Before building, prepare it like CI: copy `google-services.json`, the keystore and the signing values from `.secrets/`, and sed APP_ID/APP_HASH into `BuildVars.java`. Restore `BuildVars.java` afterwards.
+  - **Never stage** the three secret-bearing tracked files that stay modified in the clone: `TMessagesProj/config/release.keystore`, `TMessagesProj_App/google-services.json` and `gradle.properties`.
+  - Gradle fetched NDK 27.2.12479018 into `~/Library/Android/sdk/ndk/` by itself.
+  - Run: `scripts/run-android.sh --local` installs the local APK on `Pixel_6_Pro_API_34` and launches it.
+- **macOS:** native libraries built with Xcode 27 after these local, uncommitted changes:
+  - `scripts/xcode27.sh apply`.
+  - Deployment target set to 12.0 in `core-xprojects/{mtproto-engine,Stripe}`, which the script misses.
+  - The Rust libraries (`wallet-engine`, `mtproto-engine`) are pre-built **outside Xcode** with their `build.sh`. Cargo inside Xcode's build environment fails with `can't find crate for zeroize_derive`; the same command in a plain shell works. Use `RUSTUP_TOOLCHAIN=1.96.1`.
+- **iOS:** analysis completes on Xcode 27.0 with `--overrideXcodeVersion`. Compiling stops at the first `MetalCompile` because the Metal Toolchain component isn't installed. `xcodebuild -downloadComponent MetalToolchain` stalled at "Beginning asset download…"; retrying via `-exportPath`.

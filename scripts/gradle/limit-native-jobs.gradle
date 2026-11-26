@@ -1,0 +1,16 @@
+// Local-only Gradle init script (not part of the fork).
+// AGP runs ninja without -j, so ninja would use every core regardless of --max-workers.
+// Cap native compile/link concurrency per ninja invocation with CMake job pools.
+allprojects {
+    pluginManager.withPlugin('com.android.library') {
+        androidComponents {
+            finalizeDsl { ext ->
+                ext.defaultConfig.externalNativeBuild.cmake.arguments += [
+                    '-DCMAKE_JOB_POOLS=compile=3;link=1',
+                    '-DCMAKE_JOB_POOL_COMPILE=compile',
+                    '-DCMAKE_JOB_POOL_LINK=link',
+                ]
+            }
+        }
+    }
+}
