@@ -130,6 +130,12 @@ void lt_core_player_buffering(lt_core* core, int64_t now_ms, const char* item_id
   LT_CATCH_VOID
 }
 
+void lt_core_player_failed(lt_core* core, int64_t now_ms, const char* item_id) {
+  if (!core) return;
+  LT_TRY core->session.player_failed(now_ms, str(item_id));
+  LT_CATCH_VOID
+}
+
 int32_t lt_core_play(lt_core* core, int64_t now_ms) {
   if (!core) return LT_ERR_INVALID;
   LT_TRY return core->session.cmd_play(now_ms);
@@ -176,6 +182,7 @@ int32_t lt_core_insert(lt_core* core, int64_t now_ms, const char* after_item_id,
     lt::Entry e;
     e.item_id = str(entries[i].item_id);
     e.chat_id = str(entries[i].chat_id);
+    e.chat_username = str(entries[i].chat_username);
     e.msg_id = entries[i].msg_id;
     e.doc_id = str(entries[i].doc_id);
     e.title = str(entries[i].title);
@@ -245,6 +252,24 @@ int32_t lt_core_leave(lt_core* core, int64_t now_ms) {
   LT_CATCH(LT_ERR_INTERNAL)
 }
 
+void lt_core_interruption_began(lt_core* core, int64_t now_ms, int32_t reason) {
+  if (!core) return;
+  LT_TRY core->session.interruption_began(now_ms, reason);
+  LT_CATCH_VOID
+}
+
+void lt_core_interruption_ended(lt_core* core, int64_t now_ms) {
+  if (!core) return;
+  LT_TRY core->session.interruption_ended(now_ms);
+  LT_CATCH_VOID
+}
+
+void lt_core_catch_up(lt_core* core, int64_t now_ms) {
+  if (!core) return;
+  LT_TRY core->session.catch_up(now_ms);
+  LT_CATCH_VOID
+}
+
 void lt_core_set_interrupted(lt_core* core, int64_t now_ms, int32_t interrupted) {
   if (!core) return;
   LT_TRY core->session.set_interrupted(now_ms, interrupted != 0);
@@ -266,6 +291,7 @@ int32_t lt_core_poll(lt_core* core, lt_event* out) {
   out->pos_ms = e.pos;
   out->ref_ms = e.ref;
   out->chat_id = e.entry.chat_id.c_str();
+  out->chat_username = e.entry.chat_username.c_str();
   out->msg_id = e.entry.msg_id;
   out->doc_id = e.entry.doc_id.c_str();
   out->title = e.entry.title.c_str();

@@ -22,6 +22,7 @@ enum class Repeat : uint8_t { Off = 0, All = 1, One = 2 };
 struct Entry {
   std::string item_id;
   std::string chat_id;
+  std::string chat_username;  // public channel username (no @) so non-members can resolve it; may be empty
   int64_t msg_id = 0;
   std::string doc_id;
   std::string title;

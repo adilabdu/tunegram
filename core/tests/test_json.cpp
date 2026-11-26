@@ -44,6 +44,7 @@ TEST(json_protocol_op_roundtrip) {
   lt::Entry e;
   e.item_id = "i1";
   e.chat_id = "-1001234567890";
+  e.chat_username = "tunegram_music";
   e.msg_id = 77;
   e.doc_id = "5368712345678901234";
   e.title = "Song \"1\"";
@@ -61,6 +62,15 @@ TEST(json_protocol_op_roundtrip) {
   CHECK(!back.after_null);
   REQUIRE(back.entries.size() == 1);
   CHECK_EQ(back.entries[0].doc_id, std::string("5368712345678901234"));
+  CHECK_EQ(back.entries[0].chat_username, std::string("tunegram_music"));
+  // Optional: omitted on the wire when empty, parsed back as empty.
+  lt::Entry plain = e;
+  plain.chat_username.clear();
+  Value pj = lt::entry_to_json(plain, false);
+  CHECK(!pj.has("chat_username"));
+  lt::Entry pb;
+  REQUIRE(lt::entry_from_json(pj, pb));
+  CHECK(pb.chat_username.empty());
   CHECK_EQ(back.entries[0].title, std::string("Song \"1\""));
   CHECK_EQ(back.entries[0].duration_ms, static_cast<int64_t>(200000));
 

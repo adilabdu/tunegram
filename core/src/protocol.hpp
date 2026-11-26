@@ -21,7 +21,7 @@ std::string encode_hello(int version, const std::string& token, const std::strin
                          int64_t t0);
 std::string encode_ping(int64_t t0);
 std::string encode_sync(int64_t since_rev);
-std::string encode_status(const char* state);
+std::string encode_status(const char* state, const char* reason = nullptr);
 
 // Canonical JSON of the whole reducer state (including tombstones, history and
 // the anchor). Two states are equal iff these strings are equal.

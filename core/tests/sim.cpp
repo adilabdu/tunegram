@@ -136,6 +136,7 @@ void SimServer::presence(const Sock& s, bool online) {
   p.set("device_id", s.device);
   p.set("online", online);
   p.set("state", s.state);
+  if (s.state == "interrupted" && !s.reason.empty()) p.set("reason", s.reason);
   p.set("server_time", sim_.now);
   broadcast(p);
 }
@@ -226,6 +227,7 @@ void SimServer::on_message(int conn, const std::string& data) {
       p.set("user_id", o.user);
       p.set("device_id", o.device);
       p.set("state", o.state);
+      if (o.state == "interrupted" && !o.reason.empty()) p.set("reason", o.reason);
       online.push(std::move(p));
     }
     w.set("online", std::move(online));
@@ -247,6 +249,8 @@ void SimServer::on_message(int conn, const std::string& data) {
     send_log(conn, m.get_int("since_rev"));
   } else if (type == "status") {
     s.state = m.get_str("state") == "interrupted" ? "interrupted" : "active";
+    std::string reason = m.get_str("reason");
+    s.reason = s.state == "interrupted" && (reason == "call" || reason == "other_audio") ? reason : "";
     presence(s, true);
   } else if (type == "op") {
     const std::string op_id = m.get_str("op_id");
@@ -396,6 +400,7 @@ void SimClient::pump() {
         w.client_close(idx);
         break;
       case LT_EV_PLAYER_LOAD:
+        player.load_usernames.emplace_back(ev.chat_username ? ev.chat_username : "");
         player_load(ev.item_id, ev.duration_ms);
         break;
       case LT_EV_PLAYER_PLAY:
@@ -459,8 +464,13 @@ void SimClient::player_load(const std::string& item, int64_t dur) {
   uint64_t g = p.gen;
   w.sim.after(delay, [this, g, item] {
     if (!core_ || player.gen != g) return;
-    player.st = FakePlayer::Ready;
-    lt_core_player_ready(core_, local_now(), item.c_str());
+    if (player.fail_items.count(item)) {
+      player.st = FakePlayer::Idle;
+      lt_core_player_failed(core_, local_now(), item.c_str());
+    } else {
+      player.st = FakePlayer::Ready;
+      lt_core_player_ready(core_, local_now(), item.c_str());
+    }
     pump();
   });
 }
@@ -601,7 +611,8 @@ int SimClient::move(const std::string& item, const std::string* after) {
   return r;
 }
 
-std::vector<std::string> SimClient::insert(const std::string* after, int n, int64_t duration_ms) {
+std::vector<std::string> SimClient::insert(const std::string* after, int n, int64_t duration_ms,
+                                           const char* chat_username) {
   std::vector<std::string> titles, docs, chats;
   std::vector<lt_entry> es(static_cast<size_t>(n));
   titles.reserve(static_cast<size_t>(n));
@@ -622,6 +633,7 @@ std::vector<std::string> SimClient::insert(const std::string* after, int n, int6
     e.title = titles[static_cast<size_t>(i)].c_str();
     e.performer = "P";
     e.duration_ms = duration_ms;
+    e.chat_username = chat_username;
   }
   const char* ids_json = nullptr;
   int r = lt_core_insert(core_, local_now(), after ? after->c_str() : nullptr, es.data(), es.size(), &ids_json);

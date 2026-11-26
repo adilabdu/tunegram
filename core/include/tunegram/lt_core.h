@@ -82,6 +82,7 @@ typedef struct lt_event {
   const char* title;
   const char* performer;
   int64_t duration_ms;
+  const char* chat_username; /* public channel username (no @), "" if none */
 } lt_event;
 
 typedef struct lt_config {
@@ -99,6 +100,9 @@ typedef struct lt_entry {
   const char* title;
   const char* performer;
   int64_t duration_ms;
+  /* Optional (NULL or ""): username of a public channel the message lives in,
+   * so devices that are not members can resolve it. <= 32 chars, [A-Za-z0-9_]. */
+  const char* chat_username;
 } lt_entry;
 
 typedef enum lt_repeat { LT_REPEAT_OFF = 0, LT_REPEAT_ALL = 1, LT_REPEAT_ONE = 2 } lt_repeat;
@@ -130,6 +134,11 @@ LT_API void lt_core_player_started(lt_core* core, int64_t now_ms, const char* it
 LT_API void lt_core_player_position(lt_core* core, int64_t now_ms, const char* item_id, int64_t pos_ms, int32_t playing);
 LT_API void lt_core_player_ended(lt_core* core, int64_t now_ms, const char* item_id);
 LT_API void lt_core_player_buffering(lt_core* core, int64_t now_ms, const char* item_id, int32_t buffering);
+/* The item can't be played on this device (message deleted, no access, file
+ * error). The device stays silent on it (others continue) and retries only
+ * if the anchor changes; it rejoins at the next item. Emits LT_EV_ERROR
+ * "item_unavailable" (non-fatal). */
+LT_API void lt_core_player_failed(lt_core* core, int64_t now_ms, const char* item_id);
 
 /* Commands (local-first). Return LT_OK or LT_ERR_*. */
 LT_API int32_t lt_core_play(lt_core* core, int64_t now_ms);
@@ -150,7 +159,19 @@ LT_API int32_t lt_core_set_shuffle(lt_core* core, int64_t now_ms, int32_t on);
 LT_API int32_t lt_core_kick(lt_core* core, int64_t now_ms, const char* user_id);
 LT_API int32_t lt_core_end_session(lt_core* core, int64_t now_ms);
 LT_API int32_t lt_core_leave(lt_core* core, int64_t now_ms);
-/* Phone call etc.: pause locally without pausing others; 0 = catch up. */
+/* Local interruptions: this device stops following the session while everyone
+ * else keeps playing; other participants see it as "interrupted".
+ *   LT_INTERRUPT_CALL: phone/VoIP call. When it ends the device waits; the UI
+ *     offers "Catch up" -> lt_core_catch_up.
+ *   LT_INTERRUPT_OTHER_AUDIO: the user plays a voice/video message or another
+ *     track. When it ends the core rejoins at the live position by itself
+ *     (re-preparing the item, since the other audio may have taken the player).
+ * The core pauses the session item on begin; the adapter must not broadcast it. */
+typedef enum lt_interrupt_reason { LT_INTERRUPT_CALL = 1, LT_INTERRUPT_OTHER_AUDIO = 2 } lt_interrupt_reason;
+LT_API void lt_core_interruption_began(lt_core* core, int64_t now_ms, int32_t reason /* lt_interrupt_reason */);
+LT_API void lt_core_interruption_ended(lt_core* core, int64_t now_ms);
+LT_API void lt_core_catch_up(lt_core* core, int64_t now_ms);
+/* Shorthand: 1 = interruption_began(CALL), 0 = catch_up. */
 LT_API void lt_core_set_interrupted(lt_core* core, int64_t now_ms, int32_t interrupted);
 
 /* Output */

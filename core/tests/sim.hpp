@@ -102,6 +102,7 @@ class SimServer {
     std::string name;
     std::string device;
     std::string state = "active";
+    std::string reason;
   };
   void fatal(int conn, const std::string& code, int close_code, const std::string& msg = {});
   void send(int conn, const lt::json::Value& v);
@@ -135,6 +136,8 @@ struct FakePlayer {
   double rate = 1.0;        // playback speed (drift injection)
   int64_t report_noise_ms = 0;
   std::map<std::string, int64_t> extra_ms;  // real duration = metadata + extra
+  std::set<std::string> fail_items;         // loads of these report "failed"
+  std::vector<std::string> load_usernames;  // chat_username seen in each PLAYER_LOAD
 
   enum St { Idle, Loading, Ready, Starting, Playing, Paused, Ended };
   St st = Idle;
@@ -178,7 +181,8 @@ class SimClient {
   int next();
   int previous();
   int jump(const std::string& item);
-  std::vector<std::string> insert(const std::string* after, int n, int64_t duration_ms = 180000);
+  std::vector<std::string> insert(const std::string* after, int n, int64_t duration_ms = 180000,
+                                  const char* chat_username = nullptr);
   int remove(const std::string& item);
   int move(const std::string& item, const std::string* after);
   int set_repeat(int mode);

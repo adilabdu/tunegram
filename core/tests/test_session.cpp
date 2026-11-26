@@ -622,3 +622,140 @@ TEST(leave_kick_and_end) {
   CHECK(w.clients[3]->player.st == sim::FakePlayer::Idle);
   CHECK(w.server.ended());
 }
+
+TEST(capi_chat_username_reaches_remote_players) {
+  World w(27);
+  setup(w, 2, sim::LinkParams{40, 40, 10});
+  SimClient& a = *w.clients[0];
+  SimClient& b = *w.clients[1];
+  std::vector<std::string> pub = a.insert(nullptr, 1, 100000, "tunegram_music");  // public channel track
+  std::vector<std::string> priv = a.insert(&pub[0], 1, 100000);                  // host-chat track, no username
+  REQUIRE(pub.size() == 1 && priv.size() == 1);
+  w.sim.run_for(1000);
+  a.play();
+  w.sim.run_for(3000);
+  REQUIRE(!b.player.load_usernames.empty());
+  CHECK_EQ(b.player.load_usernames.back(), std::string("tunegram_music"));
+  CHECK(b.state_json().find("\"chat_username\":\"tunegram_music\"") != std::string::npos);
+  lt::State st = w.server.replay();
+  CHECK_EQ(lt::find_entry(st, pub[0])->chat_username, std::string("tunegram_music"));
+  CHECK(lt::find_entry(st, priv[0])->chat_username.empty());
+  b.next();
+  w.sim.run_for(2000);
+  CHECK_EQ(b.player.load_usernames.back(), std::string(""));
+  // Invalid usernames are refused locally.
+  lt_entry bad{nullptr, "-1001", 1, "2", "t", "p", 1000, "not a username!"};
+  CHECK_EQ(lt_core_insert(a.core(), a.local_now(), nullptr, &bad, 1, nullptr), LT_ERR_INVALID);
+  a.pump();
+}
+
+TEST(join_item_unavailable_on_one_device) {
+  World w(28);
+  setup(w, 3, sim::LinkParams{40, 40, 10});
+  SimClient& a = *w.clients[0];
+  SimClient& c = *w.clients[2];
+  std::vector<std::string> ids = a.insert(nullptr, 2, 10000);
+  c.player.fail_items.insert(ids[0]);  // c can't fetch the first message
+  w.sim.run_for(1000);
+  a.play();
+  w.sim.run_for(4000);
+  CHECK(std::find(c.errors.begin(), c.errors.end(), "item_unavailable") != c.errors.end());
+  CHECK(c.fatal_errors.empty());
+  // One attempt when the item became current (paused) and one retry when play
+  // re-anchored it; then no retry loop while the item stays current.
+  int loads = c.player.loads;
+  CHECK(loads <= 2);
+  CHECK_EQ(audible_on(w, ids[0]), 2);  // the others keep playing
+  w.sim.run_for(3000);
+  CHECK_EQ(c.player.loads, loads);
+  w.sim.run_for(6000);  // auto-advance to the second item
+  CHECK_EQ(w.reference(w.sim.now).item, ids[1]);
+  CHECK_EQ(audible_on(w, ids[1]), 3);  // c rejoins at the next item, in sync
+  CHECK_MSG(ref_error(w) <= 100, std::to_string(ref_error(w)));
+}
+
+namespace {
+std::string participant_json(SimClient& viewer, const std::string& user) {
+  lt::json::Value v;
+  if (!lt::json::parse(viewer.state_json(), v)) return {};
+  for (const auto& p : v.get("participants")->items()) {
+    if (p.get_str("user_id") == user) return lt::json::dump(p);
+  }
+  return {};
+}
+}  // namespace
+
+TEST(interrupt_other_audio_rejoins_automatically) {
+  World w(29);
+  setup(w, 3, sim::LinkParams{40, 40, 10});
+  SimClient& a = *w.clients[0];
+  SimClient& b = *w.clients[1];
+  a.insert(nullptr, 2, 600000);
+  w.sim.run_for(1000);
+  a.play();
+  w.sim.run_for(3000);
+  REQUIRE(ref_error(w) <= 50);
+  int loads_before = b.player.loads;
+
+  // b plays a voice message: the platform's player is taken over.
+  lt_core_interruption_began(b.core(), b.local_now(), LT_INTERRUPT_OTHER_AUDIO);
+  b.pump();
+  CHECK(b.player.st == sim::FakePlayer::Paused);
+  b.player_stop();  // the voice message displaces the session item in the (single) player
+  w.sim.run_for(500);
+  std::string seen = participant_json(a, "u1");
+  CHECK_MSG(seen.find("\"state\":\"interrupted\"") != std::string::npos, seen);
+  CHECK_MSG(seen.find("\"reason\":\"other_audio\"") != std::string::npos, seen);
+  CHECK(b.state_json().find("\"interruption\":{\"reason\":\"other_audio\",\"awaiting_catch_up\":false}") !=
+        std::string::npos);
+  w.sim.run_for(8000);
+  CHECK(w.reference(w.sim.now).playing);  // nobody else paused
+  CHECK(a.player.audible() && w.clients[2]->player.audible());
+
+  // Voice message over: back to the live position with no tap.
+  lt_core_interruption_ended(b.core(), b.local_now());
+  b.pump();
+  CHECK(b.player.loads > loads_before);  // the item is prepared again
+  w.sim.run_for(1500);
+  CHECK(b.player.audible());
+  CHECK_MSG(ref_error(w) <= 100, std::to_string(ref_error(w)));
+  CHECK(b.state_json().find("\"interruption\":null") != std::string::npos);
+  w.sim.run_for(500);
+  seen = participant_json(a, "u1");
+  CHECK_MSG(seen.find("\"state\":\"active\"") != std::string::npos, seen);
+  CHECK(seen.find("reason") == std::string::npos);
+}
+
+TEST(interrupt_call_waits_for_catch_up) {
+  World w(30);
+  setup(w, 2, sim::LinkParams{40, 40, 10});
+  SimClient& a = *w.clients[0];
+  SimClient& b = *w.clients[1];
+  a.insert(nullptr, 1, 600000);
+  w.sim.run_for(1000);
+  a.play();
+  w.sim.run_for(3000);
+  lt_core_interruption_began(b.core(), b.local_now(), LT_INTERRUPT_CALL);
+  b.pump();
+  CHECK(b.player.st == sim::FakePlayer::Paused);
+  w.sim.run_for(1000);
+  CHECK(participant_json(a, "u1").find("\"reason\":\"call\"") != std::string::npos);
+  // Other audio during the call keeps the call reason.
+  lt_core_interruption_began(b.core(), b.local_now(), LT_INTERRUPT_OTHER_AUDIO);
+  b.pump();
+  CHECK_EQ(S(b).interrupt_reason(), static_cast<int>(lt::kInterruptCall));
+  w.sim.run_for(5000);
+  lt_core_interruption_ended(b.core(), b.local_now());  // call over
+  b.pump();
+  w.sim.run_for(3000);
+  CHECK(b.player.st == sim::FakePlayer::Paused);  // waits for the user
+  CHECK(S(b).awaiting_catch_up());
+  CHECK(b.state_json().find("\"awaiting_catch_up\":true") != std::string::npos);
+  CHECK(participant_json(a, "u1").find("\"state\":\"interrupted\"") != std::string::npos);
+  lt_core_catch_up(b.core(), b.local_now());  // "Catch up"
+  b.pump();
+  w.sim.run_for(1500);
+  CHECK(b.player.audible());
+  CHECK_MSG(ref_error(w) <= 100, std::to_string(ref_error(w)));
+  CHECK(participant_json(a, "u1").find("\"state\":\"active\"") != std::string::npos);
+}

@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
   lt_core_player_position(c, now, "x", 0, 1);
   lt_core_player_ended(c, now, "x");
   lt_core_player_buffering(c, now, "x", 0);
+  lt_core_player_failed(c, now, "x");
   lt_core_insert(c, now, 0, &e, 1, &ids);
   lt_core_remove(c, now, rm, 1);
   lt_core_move(c, now, "x", 0);
@@ -39,6 +40,9 @@ int main(int argc, char** argv) {
   lt_core_kick(c, now, "u");
   lt_core_end_session(c, now);
   lt_core_set_interrupted(c, now, 0);
+  lt_core_interruption_began(c, now, LT_INTERRUPT_OTHER_AUDIO);
+  lt_core_interruption_ended(c, now);
+  lt_core_catch_up(c, now);
   lt_core_leave(c, now);
   while (lt_core_poll(c, &ev)) printf("%d\n", ev.type);
   printf("%s %lld %lld %lld %lld\n", lt_core_state_json(c, now), (long long)lt_core_next_timeout(c),

@@ -56,6 +56,14 @@ bool terminal_error(const std::string& code) {
 
 }  // namespace
 
+const char* interrupt_reason_name(int reason) {
+  switch (reason) {
+    case kInterruptCall: return "call";
+    case kInterruptOtherAudio: return "other_audio";
+    default: return "";
+  }
+}
+
 const char* conn_state_name(ConnState s) {
   switch (s) {
     case ConnState::Idle: return "idle";
@@ -221,7 +229,8 @@ void Session::on_welcome(int64_t now, const json::Value& m) {
   online_.clear();
   if (const json::Value* on = m.get("online"); on && on->is_array()) {
     for (const auto& p : on->items()) {
-      online_.push_back(Presence{p.get_str("user_id"), p.get_str("device_id"), p.get_str("state", "active")});
+      online_.push_back(
+          Presence{p.get_str("user_id"), p.get_str("device_id"), p.get_str("state", "active"), p.get_str("reason")});
     }
   }
   burst_left_ = kPingBurst;
@@ -235,7 +244,7 @@ void Session::on_welcome(int64_t now, const json::Value& m) {
     p.sent_at = now;
     ++stats_.resends;
   }
-  if (interrupted_) send(encode_status("interrupted"));
+  if (interrupted_) send_status();
   ui_dirty_ = true;
 }
 
@@ -298,7 +307,7 @@ void Session::on_message(int64_t now, std::string_view data) {
     online_.erase(std::remove_if(online_.begin(), online_.end(),
                                  [&](const Presence& p) { return p.user_id == uid && p.device_id == dev; }),
                   online_.end());
-    if (m.get_bool("online")) online_.push_back(Presence{uid, dev, m.get_str("state", "active")});
+    if (m.get_bool("online")) online_.push_back(Presence{uid, dev, m.get_str("state", "active"), m.get_str("reason")});
     ui_dirty_ = true;
   } else if (type == "error") {
     const std::string code = m.get_str("code");
@@ -512,8 +521,12 @@ int Session::cmd_insert(int64_t now, const std::string* after, std::vector<Entry
   if (entries.empty()) return kErrInvalid;
   for (auto& e : entries) {
     if (e.item_id.empty()) e.item_id = new_id('.');
-    if (e.item_id.size() > 64 || e.chat_id.size() > 32 || e.doc_id.size() > 32 || e.duration_ms < 0) {
+    if (e.item_id.size() > 64 || e.chat_id.empty() || e.chat_id.size() > 32 || e.doc_id.empty() ||
+        e.doc_id.size() > 32 || e.duration_ms < 0 || e.msg_id < 0 || e.chat_username.size() > 32) {
       return kErrInvalid;
+    }
+    for (char c : e.chat_username) {
+      if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) return kErrInvalid;
     }
     if (e.title.size() > 256) e.title.resize(256);
     if (e.performer.size() > 256) e.performer.resize(256);
@@ -629,21 +642,61 @@ int Session::cmd_leave(int64_t now) {
   return r;
 }
 
-void Session::set_interrupted(int64_t now, bool interrupted) {
-  if (interrupted == interrupted_) {
-    after_input(now);
-    return;
+void Session::send_status() {
+  if (conn_ != ConnState::Live) return;
+  if (interrupted_) send(encode_status("interrupted", interrupt_reason_name(interrupt_reason_)));
+  else send(encode_status("active"));
+}
+
+void Session::interruption_began(int64_t now, int reason) {
+  if (reason != kInterruptCall && reason != kInterruptOtherAudio) reason = kInterruptCall;
+  bool changed = !interrupted_ || !interrupt_active_ || interrupt_reason_ != reason;
+  // A call during other audio upgrades the reason; other audio during a call keeps "call".
+  if (!(interrupted_ && interrupt_active_ && interrupt_reason_ == kInterruptCall)) interrupt_reason_ = reason;
+  interrupted_ = true;
+  interrupt_active_ = true;
+  if (player_.st == PlayerModel::Playing) player_pause(now, std::max<int64_t>(0, player_est(now)));
+  if (reason == kInterruptOtherAudio && player_.st != PlayerModel::None) {
+    // Other audio may take over the platform's (often single) player: forget
+    // what we had loaded so the item is prepared again when we rejoin.
+    std::string preloaded = player_.preloaded;
+    player_ = PlayerModel{};
+    player_.preloaded = preloaded;
   }
-  interrupted_ = interrupted;
-  if (interrupted) {
-    if (player_.st == PlayerModel::Playing) player_pause(now, std::max<int64_t>(0, player_est(now)));
-    if (conn_ == ConnState::Live) send(encode_status("interrupted"));
-  } else {
-    if (conn_ == ConnState::Live) send(encode_status("active"));
-    player_.seen_epoch = UINT64_MAX;  // force a fresh alignment ("catch up")
+  if (changed) {
+    send_status();
+    ui_dirty_ = true;
   }
-  ui_dirty_ = true;
   after_input(now);
+}
+
+void Session::interruption_ended(int64_t now) {
+  if (interrupted_ && interrupt_active_) {
+    interrupt_active_ = false;
+    if (interrupt_reason_ == kInterruptOtherAudio) {
+      catch_up(now);  // automatic rejoin at the live position, no tap
+      return;
+    }
+    ui_dirty_ = true;  // call over: the UI offers "Catch up"
+  }
+  after_input(now);
+}
+
+void Session::catch_up(int64_t now) {
+  if (interrupted_) {
+    interrupted_ = false;
+    interrupt_active_ = false;
+    interrupt_reason_ = kInterruptNone;
+    player_.seen_epoch = UINT64_MAX;  // force a fresh alignment to the live position
+    send_status();
+    ui_dirty_ = true;
+  }
+  after_input(now);
+}
+
+void Session::set_interrupted(int64_t now, bool interrupted) {
+  if (interrupted) interruption_began(now, kInterruptCall);
+  else catch_up(now);
 }
 
 // ---------------------------------------------------------------------------
@@ -774,6 +827,10 @@ void Session::reconcile(int64_t now) {
       return;
     case PlayerModel::Loading:
       return;
+    case PlayerModel::Failed:
+      // Unplayable here: stay silent; retry only if someone re-anchors this item.
+      if (player_.failed_epoch != view_.epoch) player_load(d.item);
+      return;
     case PlayerModel::Ready:
       if (d.playing) {
         // The player finished this item but the log hasn't moved on yet.
@@ -888,6 +945,18 @@ void Session::player_ended(int64_t now, const std::string& item) {
       op.to_item = nxt;
       submit(now, std::move(op));
     }
+  }
+  after_input(now);
+}
+
+void Session::player_failed(int64_t now, const std::string& item) {
+  if (item == player_.item && player_.st != PlayerModel::None && player_.st != PlayerModel::Failed) {
+    if (view_dirty_) rebuild_view();
+    player_.st = PlayerModel::Failed;
+    player_.failed_epoch = view_.epoch;
+    player_.awaiting_start = false;
+    player_.next_query = -1;
+    emit_error("item_unavailable", false, item);
   }
   after_input(now);
 }
@@ -1071,21 +1140,35 @@ std::string Session::state_json(int64_t now) const {
     j.set("name", p.name);
     bool online = false;
     std::string state = "offline";
+    std::string reason;
     for (const auto& o : online_) {
       if (o.user_id == p.user_id) {
         online = true;
-        if (state != "active") state = o.state;
+        if (state != "active") {
+          state = o.state;
+          reason = o.state == "interrupted" ? o.reason : std::string();
+        }
       }
     }
     if (p.user_id == user_id_ && conn_ == ConnState::Live) {
       online = true;
       state = interrupted_ ? "interrupted" : "active";
+      reason = interrupted_ ? interrupt_reason_name(interrupt_reason_) : "";
     }
     j.set("online", online);
     j.set("state", state);
+    if (!reason.empty()) j.set("reason", reason);
     ps.push(std::move(j));
   }
   v.set("participants", std::move(ps));
+  if (interrupted_) {
+    json::Value li = json::Value::object();
+    li.set("reason", interrupt_reason_name(interrupt_reason_));
+    li.set("awaiting_catch_up", !interrupt_active_);
+    v.set("interruption", std::move(li));
+  } else {
+    v.set("interruption", json::Value());
+  }
   json::Value c = json::Value::object();
   c.set("offset_ms", clock_.offset());
   c.set("rtt_ms", clock_.rtt());

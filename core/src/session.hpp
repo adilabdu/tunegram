@@ -46,6 +46,9 @@ struct Event {
 enum class ConnState : uint8_t { Idle, Connecting, Handshaking, Live, Backoff, AuthRequired, Terminal };
 const char* conn_state_name(ConnState s);
 
+enum : int { kInterruptNone = 0, kInterruptCall = 1, kInterruptOtherAudio = 2 };
+const char* interrupt_reason_name(int reason);
+
 // Result codes shared with the C API.
 enum : int { kOk = 0, kErrInvalid = -1, kErrState = -2, kErrNoop = -3, kErrFull = -4 };
 
@@ -93,6 +96,7 @@ class Session {
   void player_position(int64_t now, const std::string& item, int64_t pos, bool playing);
   void player_ended(int64_t now, const std::string& item);
   void player_buffering(int64_t now, const std::string& item, bool buffering);
+  void player_failed(int64_t now, const std::string& item);
 
   // User commands (local-first). Return kOk or a negative error.
   int cmd_play(int64_t now);
@@ -110,7 +114,11 @@ class Session {
   int cmd_kick(int64_t now, const std::string& user);
   int cmd_end(int64_t now);
   int cmd_leave(int64_t now);
-  void set_interrupted(int64_t now, bool interrupted);
+  // Local interruptions (PROTOCOL.md §10). reason: kInterruptCall or kInterruptOtherAudio.
+  void interruption_began(int64_t now, int reason);
+  void interruption_ended(int64_t now);  // other_audio: rejoin at once; call: wait for catch_up
+  void catch_up(int64_t now);
+  void set_interrupted(int64_t now, bool interrupted);  // legacy: true = began(call), false = catch_up
 
   bool poll(Event& out);
 
@@ -127,6 +135,8 @@ class Session {
   const std::string& user_id() const { return user_id_; }
   const Stats& stats() const { return stats_; }
   bool interrupted() const { return interrupted_; }
+  bool awaiting_catch_up() const { return interrupted_ && !interrupt_active_; }
+  int interrupt_reason() const { return interrupt_reason_; }
   std::string state_json(int64_t now) const;
   std::string debug_pending() const;  // for tests/diagnostics
 
@@ -140,9 +150,10 @@ class Session {
     std::string user_id;
     std::string device_id;
     std::string state;
+    std::string reason;
   };
   struct PlayerModel {
-    enum St : uint8_t { None, Loading, Ready, Playing, Paused };
+    enum St : uint8_t { None, Loading, Ready, Playing, Paused, Failed };
     std::string item;
     St st = None;
     int64_t ref_pos = 0;
@@ -158,6 +169,7 @@ class Session {
     int64_t hold_until = -1;
     std::string ended_item;
     uint64_t ended_epoch = 0;
+    uint64_t failed_epoch = 0;
   };
 
   // Connection.
@@ -225,7 +237,10 @@ class Session {
 
   bool leaving_ = false;
   int64_t leave_deadline_ = -1;
-  bool interrupted_ = false;
+  bool interrupted_ = false;       // locally paused, not following the session
+  bool interrupt_active_ = false;  // the interruption itself is still going on
+  int interrupt_reason_ = kInterruptNone;
+  void send_status();
   PlayerModel player_;
 
   std::deque<Event> out_;

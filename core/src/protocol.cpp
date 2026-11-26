@@ -67,6 +67,7 @@ json::Value entry_to_json(const Entry& e, bool with_added_by) {
   json::Value v = json::Value::object();
   v.set("item_id", e.item_id);
   v.set("chat_id", e.chat_id);
+  if (!e.chat_username.empty()) v.set("chat_username", e.chat_username);
   v.set("msg_id", e.msg_id);
   v.set("doc_id", e.doc_id);
   v.set("title", e.title);
@@ -81,6 +82,7 @@ bool entry_from_json(const json::Value& v, Entry& out) {
   out = Entry{};
   out.item_id = v.get_str("item_id");
   out.chat_id = v.get_str("chat_id");
+  out.chat_username = v.get_str("chat_username");
   out.msg_id = v.get_int("msg_id");
   out.doc_id = v.get_str("doc_id");
   out.title = v.get_str("title");
@@ -244,10 +246,11 @@ std::string encode_sync(int64_t since_rev) {
   return json::dump(v);
 }
 
-std::string encode_status(const char* state) {
+std::string encode_status(const char* state, const char* reason) {
   json::Value v = json::Value::object();
   v.set("type", "status");
   v.set("state", state);
+  if (reason && *reason) v.set("reason", reason);
   return json::dump(v);
 }
 

@@ -46,7 +46,8 @@ while (lt_core_poll(core, &ev)) {
     case LT_EV_SEND:         ws_send_text(ev.data, ev.len); break;
     case LT_EV_CONNECT:      ws_open("wss://…/v1/sessions/<id>/ws"); break;  // then lt_core_on_open / lt_core_on_close
     case LT_EV_DISCONNECT:   ws_close(); break;
-    case LT_EV_PLAYER_LOAD:  player_prepare(ev.item_id, ev.chat_id, ev.msg_id, ev.doc_id); break;  // then lt_core_player_ready
+    case LT_EV_PLAYER_LOAD:  player_prepare(ev.item_id, ev.chat_id, ev.chat_username, ev.msg_id, ev.doc_id); break;
+                             // then lt_core_player_ready, or lt_core_player_failed if it can't be resolved
     case LT_EV_PLAYER_PLAY:  player_play_from(ev.pos_ms + (now_ms() - ev.ref_ms)); break;     // then lt_core_player_started
     case LT_EV_PLAYER_PAUSE: player_pause_at(ev.pos_ms); break;
     case LT_EV_PLAYER_SEEK:  player_seek(ev.pos_ms + (now_ms() - ev.ref_ms)); break;
@@ -63,7 +64,9 @@ schedule_timer_at(lt_core_next_timeout(core));  // -> lt_core_tick(core, now_ms(
 Rules for adapters:
 - One thread (or serialized calls) per `lt_core`. Event pointers are valid until the next call on the same core.
 - Route every intentional user action (UI, lock screen, headset, car) through `lt_core_play/pause/seek/next/previous/…`; never drive the player directly while in a session. The core commands the player for local and remote actions alike, so remote actions are never re-broadcast.
-- Report `ready` when the item can start, `started` when audio actually starts, `ended` at the real end of the audio, `buffering` stalls, and answer `PLAYER_QUERY` with the current position.
+- Report `ready` when the item can start, `started` when audio actually starts, `ended` at the real end of the audio, `buffering` stalls, `failed` if the message can't be resolved or played, and answer `PLAYER_QUERY` with the current position. A `LOAD` for the item that is already prepared may simply report `ready` again.
+- Local interruptions: `lt_core_interruption_began(LT_INTERRUPT_CALL | LT_INTERRUPT_OTHER_AUDIO)` / `lt_core_interruption_ended`. For other audio the core rejoins the live position by itself when it ends; after a call the UI shows "Catch up" (`state_json.interruption.awaiting_catch_up`) and calls `lt_core_catch_up`. Others see `participants[].state == "interrupted"` with a `reason`. Apply the core's `PLAYER_PAUSE` on begin only if the session item still owns the player.
+- Queue entries from a public channel should carry `chat_username`, so devices that aren't members can resolve the message.
 - `now` must be a monotonic clock (`CACurrentMediaTime`, `SystemClock.elapsedRealtime`, `steady_clock`), never wall time.
 - After `LT_EV_DISCONNECT`, drop the socket and ignore its callbacks. `LT_EV_ERROR` with `code == "unauthorized"` means: fetch fresh `initData`, get a new token, call `lt_core_set_token`.
 

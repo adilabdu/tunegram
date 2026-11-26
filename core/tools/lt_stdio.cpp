@@ -224,6 +224,18 @@ struct App {
       lt_core_set_interrupted(core, t, m.get_bool("on") ? 1 : 0);
       return LT_OK;
     }
+    if (name == "interruption_began") {
+      lt_core_interruption_began(core, t, m.get_str("reason") == "other_audio" ? LT_INTERRUPT_OTHER_AUDIO : LT_INTERRUPT_CALL);
+      return LT_OK;
+    }
+    if (name == "interruption_ended") {
+      lt_core_interruption_ended(core, t);
+      return LT_OK;
+    }
+    if (name == "catch_up") {
+      lt_core_catch_up(core, t);
+      return LT_OK;
+    }
     if (name == "move") {
       const Value* after = m.get("after");
       std::string a = after && after->is_string() ? after->as_str() : std::string();
@@ -255,6 +267,7 @@ struct App {
         };
         le.item_id = s("item_id");
         le.chat_id = s("chat_id");
+        le.chat_username = s("chat_username");
         le.doc_id = s("doc_id");
         le.title = s("title");
         le.performer = s("performer");

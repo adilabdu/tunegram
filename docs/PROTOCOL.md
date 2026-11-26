@@ -87,19 +87,19 @@ client                                   server (session DO)
 | `ping` | `t0` | Clock sample (§6). |
 | `op` | `op_id`, `kind`, `base_rev`, `at` (playback kinds), kind args (§8) | |
 | `sync` | `since_rev` | Ask for log records with `rev > since_rev` (gap repair). |
-| `status` | `state`: `"active"` or `"interrupted"` | Rebroadcast as `presence` (e.g. phone call). Not logged. |
+| `status` | `state`: `"active"` or `"interrupted"`; `reason` (with `interrupted`): `"call"` or `"other_audio"` | Rebroadcast as `presence`. Not logged. |
 
 ### 4.2 Server → client
 
 | `type` | Fields |
 |---|---|
-| `welcome` | `v`, `session_id`, `user_id`, `creator`, `head_rev`, `server_time`, `t0` (echo), `t1`, `t2`, `max_participants`, `online` (`[{user_id,device_id,state}]`) |
+| `welcome` | `v`, `session_id`, `user_id`, `creator`, `head_rev`, `server_time`, `t0` (echo), `t1`, `t2`, `max_participants`, `online` (`[{user_id,device_id,state,reason?}]`) |
 | `log` | `since_rev`, `head_rev`, `server_time`, `ops` (records, ascending `rev`), `more` (bool) |
 | `event` | `server_time`, `op` (one record) |
 | `pong` | `t0` (echo), `t1` (server receive), `t2` (server send), `head_rev` |
 | `ack` | `op_id`, `rev`, `dup:true` — only for a **duplicate** op_id (§7.3) |
 | `reject` | `op_id`, `code`, `message` — op not accepted (§12) |
-| `presence` | `user_id`, `device_id`, `online` (bool), `state`, `server_time` |
+| `presence` | `user_id`, `device_id`, `online` (bool), `state`, `reason` (only when `state` is `interrupted`), `server_time` |
 | `error` | `code`, `message`, `fatal` (bool), plus `min_v`/`max_v` for `version_unsupported`. Fatal errors are followed by a close (§12). |
 
 `snapshot{rev,state}` is reserved for compaction (§15) and not sent in v1: the log *is* the snapshot.
@@ -198,15 +198,17 @@ offset = ((t1 - t0) + (t2 - t3)) / 2          // server_time ≈ local + offset
 ### 8.3 Queue entry
 
 ```json
-{"item_id":"d7f3.12.k9x","chat_id":"-1001234567890","msg_id":5521,"doc_id":"5368712345678901234",
- "title":"Song","performer":"Artist","duration_ms":215000}
+{"item_id":"d7f3.12.k9x","chat_id":"-1001234567890","chat_username":"somechannel","msg_id":5521,
+ "doc_id":"5368712345678901234","title":"Song","performer":"Artist","duration_ms":215000}
 ```
 
 `item_id` is client-generated and unique for the session lifetime (re-adding a track makes a new id). `added_by` is **not** sent: the reducer sets it from the record's `by`.
 
+`chat_username` is **optional** (omitted or `""`): the public username (without `@`) of the channel the message lives in. A device that isn't a member of a public channel can't resolve a message from the numeric `chat_id` alone (no access hash), so entries queued from public channels should carry it; entries from the host chat don't need it. It is opaque to the reducer.
+
 ### 8.4 Field limits (server validation → `reject{code:"bad_request"}`)
 
-`op_id`, `item_id`, `from_item`, `to_item`, `after`, `user_id`, `device_id`: 1–64 chars. `chat_id`, `doc_id`: 1–32 chars. `title`, `performer`, `name`: ≤ 256 chars. `host_chat_id`: ≤ 32 chars. Integers (`msg_id`, `duration_ms`, `pos`, `at`, `base_rev`): finite, `0 ≤ x ≤ 2^53`. `mode` ∈ {off, all, one}. `on` boolean.
+`op_id`, `item_id`, `from_item`, `to_item`, `after`, `user_id`, `device_id`: 1–64 chars. `chat_id`, `doc_id`: 1–32 chars. `chat_username`: optional, 0–32 chars of `[A-Za-z0-9_]`. `title`, `performer`, `name`: ≤ 256 chars. `host_chat_id`: ≤ 32 chars. Integers (`msg_id`, `duration_ms`, `pos`, `at`, `base_rev`): finite, `0 ≤ x ≤ 2^53`. `mode` ∈ {off, all, one}. `on` boolean.
 
 ## 9. Reducer semantics (normative)
 
@@ -296,7 +298,10 @@ These rules turn the replicated state into player commands. They run on each dev
 - **Correction.** About once a second the core asks for the player position. If it differs from `timeline(server_now)` by more than **400 ms on 2 consecutive checks**, the core seeks to the live position. No playback-rate nudging and no output-latency compensation.
 - **End of track.** When the player reports the real end of the current item, the core sends `advanced(from, to)` and moves on. If the derived timeline crosses the boundary (or runs off the end of the queue) while the player is still finishing the previous item (metadata duration shorter than the audio, or this device slightly behind), the core holds up to 2 s for the real end instead of cutting the tail. If the reducer rejects the `advanced` (audio ended > 3 s before the metadata end), the device stays silent until the timeline moves on.
 - **Preload.** When an item starts, the core hints the platform to prefetch `succ_auto(cur)`.
-- **Interrupted.** During a phone call the platform marks the device interrupted: the core pauses locally, stops corrections, sends `status{interrupted}`, and does not broadcast a pause. "Catch up" clears it and jumps to the live position.
+- **Item unavailable.** If a device can't resolve or play an item (deleted message, no access), the adapter reports it; that device stays silent on the item while the others continue, retries only if the item is re-anchored (seek/play/jump), and rejoins at the next item.
+- **Interrupted.** A participant's device can stop following the session locally while everyone else keeps playing (PLAN §2.4). The core pauses the session item, stops corrections, sends `status{state:"interrupted", reason}` (others see it in `presence`), and never broadcasts a pause.
+  - `reason:"other_audio"` (the user plays a voice/video message or another track): when it ends, the core rejoins at the live position automatically, re-preparing the item because the other audio may have taken over the player.
+  - `reason:"call"`: when the call ends the device keeps waiting and the UI offers "Catch up", which rejoins at the live position. Other audio during a call keeps the `call` reason.
 - **Reconnect.** Playback continues on the last known timeline while offline. After `welcome` the device catches up from `since_rev`, resends pending ops (stale playback ops become no-ops, §9.2), and the re-anchoring rule moves the player to the live position.
 
 ## 11. Versioning
