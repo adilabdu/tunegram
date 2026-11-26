@@ -165,15 +165,13 @@ The relay below gets built once a paid Apple account exists, or earlier if the A
   - iOS Simulator and macOS builds on macOS runners, with upstream's pinned Xcode;
   - Android on Linux runners.
   - A remote build cache keeps rebuilds fast.
-- **Repos:** all private, under the personal `adilabdu` GitHub account (unrelated to any company):
+- **Repos:** all public (decided 2026-11-26), under the personal `adilabdu` GitHub account (unrelated to any company). Commits use the GitHub noreply address, and no secrets are committed: they stay in `.secrets/` locally and in GitHub Actions encrypted secrets.
   - `adilabdu/tunegram` holds the plan, shared core, backend and CI.
   - `tunegram-ios`, `tunegram-android` and `tunegram-macos` each hold a mirror of upstream plus our changes. The macOS fork's Telegram-iOS submodule points at `tunegram-ios`.
   - Local working copies are sparse partial clones, so only the files being edited take disk space.
-- **CI cost (private repos):**
-  - About 200 free macOS build minutes a month; after that, $0.062 per minute.
-  - Android builds run on Linux and fit within the free allowance.
-  - Estimate during active iPhone/Mac development: roughly $100–300 a month.
-  - Alternative: a one-time external SSD, so Apple builds run locally instead.
+- **CI cost:** free. Public repos get unlimited minutes on GitHub's standard runners, macOS included.
+  - The standard macOS runners are small (3-core M1, 7 GB RAM). The first Telegram iOS build in Phase 0 confirms the build fits.
+  - Fallback: a one-time external SSD, so Apple builds run locally instead.
 - **This Mac only runs the results:**
   - the iOS Simulator (iOS 18 runtime already installed);
   - the Android Emulator (Pixel AVD, API 34, already installed);
@@ -232,7 +230,7 @@ Only the account owner can create accounts, accept terms and handle payment. Sec
 
 Items 3–7 are done in the owner's Chrome via the Claude browser extension. The owner types only login codes and passwords.
 
-1. ~~Free about 100 GB~~ → replaced by cloud builds (§5.1). Needs a decision: public or private GitHub repo for the forks.
+1. ~~Free about 100 GB~~ → replaced by cloud builds (§5.1), in public repos (decided 2026-11-26).
 2. ~~Paid Apple Developer Program~~ → replaced by free Apple ID signing (§5.1). Needs: the owner's Apple ID signed in once in Xcode on this Mac (Settings → Accounts).
 3. ~~**Telegram API credentials**~~ → done 2026-11-26. Telegram allows one `api_id` per account, and the owner's account already had one, so Tunegram reuses that `api_id`/`api_hash` (saved in `.secrets/telegram.json`). The existing app's settings weren't changed.
 4. ~~**Telegram bot**~~ → done 2026-11-26: @TunegramSyncBot, token in `.secrets/bot.json` (verified with `getMe`). The Mini App is attached when the landing page is deployed.
