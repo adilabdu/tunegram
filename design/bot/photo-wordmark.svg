@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640">
+  <!-- Alternative stand-in bot photo with the full name. Hard to read at chat-list size; photo.svg is the recommended one. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#40A8FA"/>
+      <stop offset="1" stop-color="#2382E8"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <text x="320" y="352" text-anchor="middle" font-family="Avenir Next, Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="104" letter-spacing="-1" fill="#FFFFFF">Tunegram</text>
+</svg>
