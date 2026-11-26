@@ -51,7 +51,7 @@ There is no sign-up and no separate login (see §4.4). No new permission prompts
 | Phone call on one device | That person is marked "interrupted"; others continue; "Catch up" when the call ends |
 | Playing other audio during a session (voice message, video message, another song) | Treated like a phone call: that person is marked "interrupted" and everyone else keeps playing. When the other audio ends, they automatically rejoin at the live position, with no tap needed. Applies on all platforms; it matters most on macOS, which has only one player (owner decision 2026-11-26) |
 | One device loses connection | "Reconnecting…" shown; on return it jumps to the live position |
-| Next track not ready on one device | Others wait up to 3 s, then continue; the late device joins at the live position |
+| Next track not ready on one device | Others carry on without waiting; the late device joins at the live position as soon as it's ready (as built in the core, 2026-11-26) |
 | Someone leaves | Everyone else continues; if the creator leaves, the session continues for the remaining listeners |
 | iPhone paused in the background | App kept awake while the session is paused (up to 60 min), so remote play just works. After that, the iPhone leaves the session and shows a local "Session paused for a while — tap to rejoin" notification. Without a paid Apple account there are no remote pushes, so the longer keep-awake window replaces them |
 | Android paused in the background | The music service stays in the foreground for the whole session, so remote play always works |
