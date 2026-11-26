@@ -687,7 +687,7 @@ void Session::catch_up(int64_t now) {
     interrupted_ = false;
     interrupt_active_ = false;
     interrupt_reason_ = kInterruptNone;
-    player_.seen_epoch = UINT64_MAX;  // force a fresh alignment to the live position
+    player_.seen = AnchorSig{};  // force a fresh alignment to the live position
     send_status();
     ui_dirty_ = true;
   }
@@ -829,36 +829,36 @@ void Session::reconcile(int64_t now) {
       return;
     case PlayerModel::Failed:
       // Unplayable here: stay silent; retry only if someone re-anchors this item.
-      if (player_.failed_epoch != view_.epoch) player_load(d.item);
+      if (!(player_.failed_sig == anchor_sig())) player_load(d.item);
       return;
     case PlayerModel::Ready:
       if (d.playing) {
         // The player finished this item but the log hasn't moved on yet.
-        if (player_.ended_item == d.item && player_.ended_epoch == view_.epoch) return;
+        if (player_.ended_item == d.item && player_.ended_sig == anchor_sig()) return;
         player_play(now, d.pos);
       } else {
         player_pause(now, d.pos);
       }
-      player_.seen_epoch = view_.epoch;
+      player_.seen = anchor_sig();
       return;
     case PlayerModel::Playing:
       if (!d.playing) {
         player_pause(now, d.pos);
-        player_.seen_epoch = view_.epoch;
+        player_.seen = anchor_sig();
         return;
       }
       break;
     case PlayerModel::Paused:
       if (d.playing) {
         player_play(now, d.pos);
-        player_.seen_epoch = view_.epoch;
+        player_.seen = anchor_sig();
         return;
       }
       break;
   }
 
-  if (player_.seen_epoch != view_.epoch) {
-    player_.seen_epoch = view_.epoch;
+  if (!(player_.seen == anchor_sig())) {
+    player_.seen = anchor_sig();
     if (iabs(player_est(now) - d.pos) > cfg_.reanchor_tolerance_ms) {
       player_seek(now, d.pos);
       ++stats_.reanchor_seeks;
@@ -934,7 +934,7 @@ void Session::player_ended(int64_t now, const std::string& item) {
   player_.ref_pos = e ? e->duration_ms : player_.ref_pos;
   player_.next_query = -1;
   player_.ended_item = item;
-  player_.ended_epoch = view_.epoch;
+  player_.ended_sig = anchor_sig();
   if (!interrupted_ && conn_ != ConnState::Terminal && !leaving_) {
     Timeline d = playback(now);
     std::string nxt = succ_auto(view_, item);
@@ -953,7 +953,7 @@ void Session::player_failed(int64_t now, const std::string& item) {
   if (item == player_.item && player_.st != PlayerModel::None && player_.st != PlayerModel::Failed) {
     if (view_dirty_) rebuild_view();
     player_.st = PlayerModel::Failed;
-    player_.failed_epoch = view_.epoch;
+    player_.failed_sig = anchor_sig();
     player_.awaiting_start = false;
     player_.next_query = -1;
     emit_error("item_unavailable", false, item);

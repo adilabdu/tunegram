@@ -759,3 +759,33 @@ TEST(interrupt_call_waits_for_catch_up) {
   CHECK_MSG(ref_error(w) <= 100, std::to_string(ref_error(w)));
   CHECK(participant_json(a, "u1").find("\"state\":\"active\"") != std::string::npos);
 }
+
+TEST(reconnect_after_track_ended_offline) {
+  // The offline device's own track ends during the outage (it queues an
+  // `advanced`), while someone else pressed next. On return it must land on the
+  // live position of the item the others are playing.
+  World w(31);
+  setup(w, 3, sim::LinkParams{30, 30, 5});
+  SimClient& a = *w.clients[0];
+  SimClient& c = *w.clients[2];
+  std::vector<std::string> ids = a.insert(nullptr, 3, 20000);
+  w.sim.run_for(1000);
+  a.play();
+  w.sim.run_for(10000);
+  w.set_net(2, false);
+  w.sim.run_for(500);
+  a.next();
+  w.sim.run_for(11000);  // c's first track ends while it is offline
+  CHECK(!c.player.ended_items.empty());
+  w.set_net(2, true);
+  for (int i = 0; i < 200 && !c.live(); ++i) w.sim.run_for(50);
+  REQUIRE(c.live());
+  // Re-aligned right after catch-up (not only by the slower 2-check correction).
+  w.sim.run_for(700);
+  CHECK_MSG(ref_error(w) <= 100, std::to_string(ref_error(w)));
+  CHECK_EQ(S(c).stats().corrections, static_cast<uint64_t>(0));
+  w.sim.run_for(5000);
+  std::string why;
+  CHECK_MSG(w.converged(&why), why);
+  CHECK_MSG(ref_error(w) <= 100, std::to_string(ref_error(w)));
+}

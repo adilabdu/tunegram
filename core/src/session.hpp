@@ -152,6 +152,16 @@ class Session {
     std::string state;
     std::string reason;
   };
+  // Identity of the playback anchor. The epoch counter alone is not enough:
+  // after a rebase two different histories can reach the same epoch value.
+  struct AnchorSig {
+    std::string cur;
+    int64_t pos = -1;
+    int64_t time = -1;
+    bool playing = false;
+    uint64_t epoch = UINT64_MAX;
+    bool operator==(const AnchorSig&) const = default;
+  };
   struct PlayerModel {
     enum St : uint8_t { None, Loading, Ready, Playing, Paused, Failed };
     std::string item;
@@ -160,7 +170,7 @@ class Session {
     int64_t ref_local = 0;
     bool buffering = false;
     bool awaiting_start = false;
-    uint64_t seen_epoch = UINT64_MAX;
+    AnchorSig seen;  // anchor the player was last aligned to
     int off_count = 0;
     int64_t last_check = INT64_MIN / 2;
     int64_t next_query = -1;
@@ -168,8 +178,8 @@ class Session {
     std::string hold_from;
     int64_t hold_until = -1;
     std::string ended_item;
-    uint64_t ended_epoch = 0;
-    uint64_t failed_epoch = 0;
+    AnchorSig ended_sig;
+    AnchorSig failed_sig;
   };
 
   // Connection.
@@ -189,6 +199,9 @@ class Session {
   void finish_leave();
 
   // Player driver.
+  AnchorSig anchor_sig() const {
+    return AnchorSig{view_.cur, view_.anchor_pos, view_.anchor_time, view_.playing, view_.epoch};
+  }
   int64_t player_est(int64_t now) const;
   int64_t local_pos(int64_t now, const Timeline& d) const;
   void reconcile(int64_t now);

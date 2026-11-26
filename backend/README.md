@@ -20,6 +20,14 @@ Other commands:
 | `npm run dev` | `wrangler dev --local` on http://127.0.0.1:8787 (needs `backend/.dev.vars`, see below) |
 | `npm run e2e` | End-to-end: real C++ core clients ↔ this Worker under `wrangler dev` (see below) |
 
+## End-to-end test (one command)
+
+```sh
+cd backend && npm install && npm run e2e
+```
+
+`e2e/run.mjs` builds `core/tools/lt_stdio` (CMake, into `core/build-e2e/`), starts this Worker with `wrangler dev --local` on a free port with a generated Ed25519 key and token secret, signs Telegram-style `initData` for three users, creates a session and redeems invites, then runs three real C++ core clients (one `lt_stdio` process each, with a built-in fake player) bridged over WebSockets. It checks: joining, queue convergence (including `chat_username`), play/seek/pause sync across devices, concurrent edits from all three, a 6 s network drop with catch-up at the live position, automatic advance at the end of a track, an "other audio" interruption with automatic rejoin, a protocol-version mismatch, and ending the session. It prints PASS/FAIL per check plus timing metrics and exits non-zero on failure (about 30 s). `LT_E2E_VERBOSE=1` shows wrangler and build output.
+
 ## Layout
 
 | Path | What |

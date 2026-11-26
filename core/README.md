@@ -78,7 +78,7 @@ Measured on arm64 macOS (Apple clang 21):
 
 | Build | `liblt_core.a` | Added to a linked, stripped binary |
 |---|---|---|
-| Release (`-O3`) | 266 KB | ~150 KB |
-| MinSizeRel (`-Os`, recommended for apps) | 264 KB | ~119 KB |
+| Release (`-O3`) | 286 KB | ~168 KB |
+| MinSizeRel (`-Os`, recommended for apps) | 276 KB | ~136 KB |
 
 The archive size is mostly symbol tables; the second column (`lt_size_probe` minus an empty program, both stripped) is what an app pays.
