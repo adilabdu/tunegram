@@ -143,7 +143,7 @@ Telegram can't push to an app that uses another developer's APNs/FCM credentials
 
 **Status: deferred.** Without a paid Apple account, iPhones can't receive remote pushes at all (free Apple IDs don't include Push Notifications). Until then, every platform still gets notifications:
 - **iPhone:** official Telegram stays installed alongside the fork and delivers message and call notifications. Invites arrive as normal messages. The `t.me` link opens the landing page, which offers "Open in Tunegram" through the app's URL scheme. Inside the fork, `t.me` links are intercepted natively.
-- **Android:** Telegram's built-in background connection ("keep-alive service", made for phones without Google services) delivers notifications with no FCM dependency.
+- **Android:** my.telegram.org has a **Push credentials** section that accepts an FCM service account (confirmed 2026-11-26). Once our Firebase service account is uploaded there, Telegram pushes directly to the fork through FCM, with no relay needed. The owner uploads the key file personally. Until then, Telegram's built-in background connection ("keep-alive service") delivers notifications.
 - **macOS:** the app stays connected while it runs and shows notifications itself.
 
 The relay below gets built once a paid Apple account exists, or earlier if the Android background connection proves unreliable.
@@ -234,8 +234,8 @@ Items 3–7 are done in the owner's Chrome via the Claude browser extension. The
 
 1. ~~Free about 100 GB~~ → replaced by cloud builds (§5.1). Needs a decision: public or private GitHub repo for the forks.
 2. ~~Paid Apple Developer Program~~ → replaced by free Apple ID signing (§5.1). Needs: the owner's Apple ID signed in once in Xcode on this Mac (Settings → Accounts).
-3. **Telegram API credentials** from my.telegram.org → API development tools: `api_id` and `api_hash`, saved to `.secrets/`.
-4. **Telegram bot** via @BotFather (through Telegram Web): bot token saved to `.secrets/`. The Mini App is attached when the landing page is deployed.
+3. ~~**Telegram API credentials**~~ → done 2026-11-26. Telegram allows one `api_id` per account, and the owner's account already had one, so Tunegram reuses that `api_id`/`api_hash` (saved in `.secrets/telegram.json`). The existing app's settings weren't changed.
+4. ~~**Telegram bot**~~ → done 2026-11-26: @TunegramSyncBot, token in `.secrets/bot.json` (verified with `getMe`). The Mini App is attached when the landing page is deployed.
 5. ~~**Firebase project**~~ → done 2026-11-26: project "Tunegram" (`tum-58a04`), Spark plan, Analytics and Gemini off; Android app `app.tunegram.android` registered; `google-services.json` is in `.secrets/`.
 6. **Cloudflare account** (free). Needed only when the backend is deployed (§6, Phase 3–4); local development uses the local Workers runtime.
 7. **App name and IDs:** working name Tunegram (§1).
