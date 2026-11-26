@@ -23,7 +23,7 @@ All bodies are JSON. Errors are `{"error":{"code":"<code>","message":"<text>"}}`
 |---|---|---|---|
 | `POST /v1/auth` | — | `{"init_data":"<raw Telegram initData query string>"}` | `200 {"token","expires_at","user":{"id","name","username"}}` |
 | `POST /v1/sessions` | Bearer | `{"host_chat_id":"-1001234","title":"optional"}` | `201 {"session_id","ws_path"}` |
-| `POST /v1/sessions/:id/invites` | Bearer, participant or creator | `{"ttl_s":3600}` (optional, 60…86400, default 21600) | `201 {"invite_token","link","expires_at"}` |
+| `POST /v1/sessions/:id/invites` | Bearer, any member (not kicked) | `{"ttl_s":3600}` (optional, 60…86400, default 21600) | `201 {"invite_token","link","expires_at"}` |
 | `POST /v1/invites/redeem` | Bearer | `{"invite_token":"…"}` | `200 {"session_id","host_chat_id","title","ws_path"}` |
 | `GET /v1/sessions/:id/ws` | (in `hello`) | WebSocket upgrade | `101` |
 | `GET /health` | — | — | `200 ok` |
