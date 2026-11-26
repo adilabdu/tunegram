@@ -1,3 +1,10 @@
 .secrets/
 .DS_Store
 .artifacts/
+# core / backend build outputs
+core/build*/
+backend/node_modules/
+backend/.wrangler/
+backend/.dev.vars
+backend/e2e/.tmp/
+*.tsbuildinfo
