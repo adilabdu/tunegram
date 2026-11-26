@@ -236,7 +236,7 @@ Items 3–7 are done in the owner's Chrome via the Claude browser extension. The
 2. ~~Paid Apple Developer Program~~ → replaced by free Apple ID signing (§5.1). Needs: the owner's Apple ID signed in once in Xcode on this Mac (Settings → Accounts).
 3. **Telegram API credentials** from my.telegram.org → API development tools: `api_id` and `api_hash`, saved to `.secrets/`.
 4. **Telegram bot** via @BotFather (through Telegram Web): bot token saved to `.secrets/`. The Mini App is attached when the landing page is deployed.
-5. **Firebase project** (free Spark plan; billing deferred along with the push relay). Android app registered for `app.tunegram.android`; `google-services.json` downloaded.
+5. ~~**Firebase project**~~ → done 2026-11-26: project "Tunegram" (`tum-58a04`), Spark plan, Analytics and Gemini off; Android app `app.tunegram.android` registered; `google-services.json` is in `.secrets/`.
 6. **Cloudflare account** (free). Needed only when the backend is deployed (§6, Phase 3–4); local development uses the local Workers runtime.
 7. **App name and IDs:** working name Tunegram (§1).
 8. **Devices:** two iPhones already connected; later they need Developer Mode on. Simulators and the emulator come first.
