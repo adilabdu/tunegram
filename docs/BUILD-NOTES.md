@@ -58,11 +58,12 @@ Secrets are never committed. CI injects `TG_API_ID`/`TG_API_HASH` at build time,
 
 For local builds, the scripts still need a "use a locally built app" path where it's missing (Android and macOS). None of the three has launched a real build yet.
 
-## Local build volume (external drive)
-- The `SARAH` drive (WD My Passport 2 TB, a spinning disk) is formatted FAT32: no symlinks, no Unix permissions, and a 4 GB file limit. Builds therefore run inside a sparse APFS disk image at `/Volumes/SARAH/Claude/TunegramBuild.sparsebundle`. It uses 64 MB bands, grows up to 600 GB, and mounts at `/Volumes/TunegramBuild`.
-- Mount it with `scripts/mount-build-volume.sh`. Eject it with `scripts/mount-build-volume.sh eject` before unplugging SARAH.
-- Point every big build directory at the volume: Bazel output root, Xcode DerivedData, `GRADLE_USER_HOME`, and the source checkouts. The internal disk has only about 10 GB free.
-- Measured 2026-11-26 over USB 2.0 (480 Mb/s link):
+## Local build volume: "SARAH Mac" (external drive)
+- The `SARAH` drive (WD My Passport 2 TB, a spinning disk, on a USB 2.0 link) is formatted FAT32: no symlinks, no Unix permissions, and a 4 GB file limit.
+- Builds and large files therefore live in a sparse APFS disk image at `/Volumes/SARAH/Claude/SARAH Mac.sparsebundle`. It uses 64 MB bands and grows on demand up to 750 GB.
+- The volume is named **SARAH Mac** (what Finder shows), but it mounts at `~/.sarah-mac`, a path without spaces, because Bazel, autotools and the ndk break on spaces.
+- Mount it with `scripts/sarah-mac.sh`. Before unplugging SARAH, run `scripts/sarah-mac.sh eject` (or eject SARAH Mac in Finder), then eject SARAH.
+- Point the big build directories here when they don't fit on the internal disk: Bazel output root, Xcode DerivedData, `GRADLE_USER_HOME`, source checkouts.
+- Measured 2026-11-26 over USB 2.0:
   - **Raw FAT32:** about 36 MB/s write, 38 MB/s read, and only about 100 small files/s written.
-  - **Inside the APFS image:** about 4,100 small files/s written and about 22 MB/s uncached read. Symlinks and the executable bit work.
-  - A USB 3 connection (the drive supports it) would raise the sequential limit about 3x.
+  - **Inside the image:** about 4,100 small files/s written and about 22 MB/s uncached read.
