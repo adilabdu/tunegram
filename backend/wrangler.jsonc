@@ -1,0 +1,28 @@
+// Tunegram Listen Together backend. Local development only for now:
+//   npx wrangler dev --local     (no Cloudflare account needed)
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tunegram-listen-together",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "SESSION", "class_name": "SessionDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SessionDO"] }],
+  "vars": {
+    // "prod" or "test": selects Telegram's Ed25519 public key for initData.
+    "TELEGRAM_ENV": "prod",
+    // Numeric bot id (the part of the bot token before ':'); needed for Ed25519 validation.
+    "BOT_ID": "",
+    "BOT_USERNAME": "TunegramSyncBot",
+    "MINI_APP_SHORT_NAME": "listen",
+    "MAX_PARTICIPANTS": "10",
+    "MIN_PROTOCOL_VERSION": "1",
+    "MAX_PROTOCOL_VERSION": "1",
+    "TOKEN_TTL_S": "3600",
+    "INIT_DATA_MAX_AGE_S": "3600"
+  }
+  // Secrets (never committed): TOKEN_SECRET (required), BOT_TOKEN (optional, enables the HMAC path).
+  // Local dev: put them in backend/.dev.vars (git-ignored).
+}
