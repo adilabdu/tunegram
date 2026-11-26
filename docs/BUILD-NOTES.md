@@ -63,7 +63,7 @@ For local builds, the scripts still need a "use a locally built app" path where 
 - Builds and large files therefore live in a sparse APFS disk image at `/Volumes/SARAH/Claude/SARAH Mac.sparsebundle`. It uses 64 MB bands and grows on demand up to 750 GB.
 - The volume is named **SARAH Mac** and mounts at the standard `/Volumes/SARAH Mac` (changed 2026-11-26). It holds storage only, so the space in the path doesn't matter, and the shorter path keeps the 158-level-deep Downloads archive under macOS's 1023-byte path limit.
 - Mount it with `scripts/sarah-mac.sh`. Before unplugging SARAH, run `scripts/sarah-mac.sh eject` (or eject SARAH Mac in Finder), then eject SARAH.
-- **Policy (2026-11-26):** all active work happens on the internal disk: source checkouts, Bazel output root, Xcode DerivedData, `GRADLE_USER_HOME` and agent scratch, under `~/tunegram-work` or the repo. The owner freed space for this (76 GB free). SARAH Mac holds storage and archives only; it's too slow for builds.
+- **Policy (2026-11-26):** all active work happens on the internal disk: source checkouts, Bazel output root, Xcode DerivedData, `GRADLE_USER_HOME` and agent scratch, under `~/Documents/projects/tunegram-work` or the repo. The owner freed space for this (76 GB free). SARAH Mac holds storage and archives only; it's too slow for builds.
 - Measured 2026-11-26 over USB 2.0:
   - **Raw FAT32:** about 36 MB/s write, 38 MB/s read, and only about 100 small files/s written.
   - **Inside the image:** about 4,100 small files/s written and about 22 MB/s uncached read.
