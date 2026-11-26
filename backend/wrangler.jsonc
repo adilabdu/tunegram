@@ -14,7 +14,7 @@
     // "prod" or "test": selects Telegram's Ed25519 public key for initData.
     "TELEGRAM_ENV": "prod",
     // Numeric bot id (the part of the bot token before ':'); needed for Ed25519 validation.
-    "BOT_ID": "",
+    "BOT_ID": "9028694883",
     "BOT_USERNAME": "TunegramSyncBot",
     "MINI_APP_SHORT_NAME": "listen",
     "MAX_PARTICIPANTS": "10",

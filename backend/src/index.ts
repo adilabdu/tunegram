@@ -2,6 +2,7 @@
 // per-session Durable Object (PROTOCOL.md §3).
 import { bearer, issueToken, verifyInitData } from "./auth";
 import type { Env } from "./env";
+import { landingPage } from "./landing";
 import { b64urlDecode, b64urlEncode, errorResponse, json, randomBytes, readJson } from "./util";
 
 export { SessionDO } from "./session";
@@ -24,6 +25,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
   const nowS = Math.floor(Date.now() / 1000);
 
   if (path === "/health" && req.method === "GET") return new Response("ok");
+  if ((path === "/" || path === "/app") && req.method === "GET") return landingPage();
 
   if (path === "/v1/auth" && req.method === "POST") {
     const body = await readJson(req);
