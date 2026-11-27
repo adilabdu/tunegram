@@ -79,4 +79,13 @@ For local builds, the scripts still need a "use a locally built app" path where 
   - `scripts/xcode27.sh apply`.
   - Deployment target set to 12.0 in `core-xprojects/{mtproto-engine,Stripe}`, which the script misses.
   - The Rust libraries (`wallet-engine`, `mtproto-engine`) are pre-built **outside Xcode** with their `build.sh`. Cargo inside Xcode's build environment fails with `can't find crate for zeroize_derive`; the same command in a plain shell works. Use `RUSTUP_TOOLCHAIN=1.96.1`.
-- **iOS:** analysis completes on Xcode 27.0 with `--overrideXcodeVersion`. Compiling stops at the first `MetalCompile` because the Metal Toolchain component isn't installed. `xcodebuild -downloadComponent MetalToolchain` stalled at "Beginning asset download…"; retrying via `-exportPath`.
+- **Metal Toolchain (needed by iOS and macOS on Xcode 27):** about 839 MB. The download sat at "Beginning asset download…" because **Low Data Mode was on for the Wi-Fi**, and macOS defers large asset downloads in that mode. Turning it off fixed it: `xcodebuild -downloadComponent metalToolchain` then finished in minutes.
+- **iOS:** ✅ builds on Xcode 27.0 (`--overrideXcodeVersion`, `debug_sim_arm64`) in about 21 min once the dependencies are fetched. GitHub release downloads crawl at about 60 KB/s from this network, which made the first fetch slow.
+  - Master uses one iOS 27.1 SDK API, `UIView.reservedRegions`, for iPhone Duo fold and occlusion regions. It's guarded only at runtime, so the 27.0 SDK can't compile it. The local, uncommitted patch drops it in `submodules/Display/Source/{WindowContent,ReservedArea}.swift`. **Updating to Xcode 27.1 removes the need; that update needs the owner's Apple ID.**
+  - The local `.bazelrc` adds `--//Telegram:disableProvisioningProfiles`, `--jobs=5` and `--local_resources=memory=HOST_RAM*.45`.
+  - This Xcode 27 install has no `Simulator.app`. The simulator runs headless: `scripts/run-ios-sim.sh --local` installs and launches the app, and the Claude Simulator panel shows it. Unpack `bazel-bin/Telegram/Telegram.ipa` → `Payload/Telegram.app` into `.artifacts/ios/` first.
+- **macOS app:** ✅ builds and runs.
+  - Build command: `xcodebuild build -workspace Telegram-Mac.xcworkspace -scheme Telegram -configuration Debug -destination 'platform=macOS,arch=arm64' -derivedDataPath ~/Documents/projects/tunegram-work/mac-derived CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=`.
+  - Don't pass `CODE_SIGN_IDENTITY[sdk=macosx*]=-`; xcodebuild mis-parses it.
+  - Inject the API credentials with `.github/tunegram/inject_api_credentials.py` only for the build, then restore them.
+  - Fork commit a440b0b: the app falls back to `~/Library/Application Support/app.tunegram.mac` when the team-prefixed group container isn't writable. Ad-hoc builds crashed with "Don't have write access to database folder".

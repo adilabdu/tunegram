@@ -128,7 +128,9 @@ if [ "$STATE" != "Booted" ]; then
   xcrun simctl boot "$UDID"
 fi
 xcrun simctl bootstatus "$UDID" -b >/dev/null
-open -a Simulator --args -CurrentDeviceUDID "$UDID"
+SIM_APP="$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.iphonesimulator'" 2>/dev/null | head -1)"
+[ -z "$SIM_APP" ] && SIM_APP="$(xcode-select -p)/Applications/Simulator.app"
+open "$SIM_APP" --args -CurrentDeviceUDID "$UDID" 2>/dev/null || echo "==> Simulator window app not found; the simulator runs headless (use simctl / the Claude Simulator panel)"
 
 log "Installing and launching"
 xcrun simctl install "$UDID" "$APP"
